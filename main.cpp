@@ -10,29 +10,34 @@ using namespace boost::unit_test;
 BOOST_AUTO_TEST_SUITE(test_suite_main)
 
 template <typename KeyType, typename ValueType>
-class AvlTree
-{
+class Node
+{    
 public:
-    struct Node
-    {
-        Node(KeyType key, ValueType value):
-            key(key),
-            value(value)
-        {}
-        AvlTree*    parent {nullptr} ;
-        AvlTree*    leftSubTree {nullptr};
-        AvlTree*    rightSubTree {nullptr};
-        ValueType   value;
-        KeyType     key;
-        int         height{1};
-    };
+    Node(Node* node):
+        key_(node->key_),
+        value_(node->value_)
+    {}
+
+    Node(KeyType key, ValueType value):
+        key_(key),
+        value_(value)
+    {}
+
+    Node* getLeftSubTree() const {return leftSubTree; }
+    Node* getRightSubTree() const {return rightSubTree; }
+    KeyType getKey() const { return key_; }
 
 private:
-    Node* node_{nullptr};
+    Node*       leftSubTree {nullptr};
+    Node*       rightSubTree {nullptr};
+    ValueType   value_;
+    KeyType     key_;
+    int         height{1};
 
+private:
 
+    int getHeight() const { return height; }
 
-    int getHeight() const { return node_? node_->height: 0; }
     int getHeightLeft(Node* node) const { return node->leftSubTree? node->leftSubTree->getHeight():0;}
     int getHeightRight(Node* node) const { return node->rightSubTree? node->rightSubTree->getHeight():0;}
 
@@ -48,13 +53,13 @@ private:
         if(!rightSubtree)
             return nullptr;
 
-        pivotNode->rightSubTree = rightSubtree->node_->leftSubTree;
-        rightSubtree->node_->leftSubTree = new AvlTree(pivotNode);
+        pivotNode->rightSubTree = rightSubtree->leftSubTree;
+        rightSubtree->leftSubTree = new Node(pivotNode);
 
         recalculateHeight(pivotNode);
-        recalculateHeight(rightSubtree->node_);
+        recalculateHeight(rightSubtree);
 
-        return rightSubtree->node_;
+        return rightSubtree;
     }
 
     Node* rotateRight(Node* pivotNode)
@@ -66,87 +71,69 @@ private:
         if(!leftSubtree)
             return nullptr;
 
-        pivotNode->leftSubTree= leftSubtree->node_->rightSubTree;
-        leftSubtree->node_->rightSubTree = new AvlTree(pivotNode);
+        pivotNode->leftSubTree= leftSubtree->rightSubTree;
+        leftSubtree->rightSubTree = new Node(pivotNode);
 
         recalculateHeight(pivotNode);
-        recalculateHeight(leftSubtree->node_);
+        recalculateHeight(leftSubtree);
 
-        return leftSubtree->node_;
+        return leftSubtree;
     }
 
     Node* bigRotateLeft(Node* node)
     {
-        node->rightSubTree->node_ = rotateRight(node->rightSubTree->node_);
+        node->rightSubTree = rotateRight(node->rightSubTree);
         return rotateLeft(node);
     }
 
     Node* bigRotateRight(Node* node)
     {
-        node->leftSubTree->node_ = rotateLeft(node->leftSubTree->node_);
+        node->leftSubTree = rotateLeft(node->leftSubTree);
         return rotateRight(node);
     }
 
 public:
-
-    AvlTree(KeyType key, ValueType value)
-    {
-        node_ = new Node(key, value);
-    }
-
-    AvlTree(Node* node)
-    {
-        node_ = node;
-    }
-
-    ~AvlTree()
-    {
-        delete node_;
-    }
-
-    Node* getNode() const { return node_; }
-
     Node* insert(KeyType key, ValueType value)
     {        
-        if(key <= node_->key)
+        if(key <= key_)
         {
-            if(node_->leftSubTree)
+            if(leftSubTree)
             {
-                node_->leftSubTree->node_ = node_->leftSubTree->insert(key, value);
+               leftSubTree = leftSubTree->insert(key, value);
             }
             else
             {
-                node_->leftSubTree = new AvlTree(key, value);                
+                leftSubTree = new Node(key, value);
             }
         }
         else
         {
-            if(node_->rightSubTree)
+            if(rightSubTree)
             {
-                node_->rightSubTree->node_ = node_->rightSubTree->insert(key, value);
+                rightSubTree = rightSubTree->insert(key, value);
             }
             else
             {
-                node_->rightSubTree = new AvlTree(key, value);                
+                rightSubTree = new Node(key, value);
             }
         }
 
-        recalculateHeight(node_);
-        auto balance = getBalance(node_);
+        recalculateHeight(this);
+        auto balance = getBalance(this);
 
-        if (balance > 1 && node_->leftSubTree && key <= node_->leftSubTree->node_->key)
-            return rotateRight(node_);
+        if (balance > 1 && leftSubTree && key <= leftSubTree->key_)
+            return rotateRight(this);
 
-        if (balance < -1 && node_->rightSubTree && key > node_->rightSubTree->node_->key)
-            return rotateLeft(node_);
+        if (balance < -1 && rightSubTree && key > rightSubTree->key_)
+            return rotateLeft(this);
 
-        if (balance > 1 && node_->leftSubTree && key > node_->leftSubTree->node_->key)
-            return bigRotateRight(node_);
+        if (balance > 1 && leftSubTree && key > leftSubTree->key_)
+            return bigRotateRight(this);
 
-        if (balance < -1 && node_->rightSubTree && key < node_->rightSubTree->node_->key)
-            return bigRotateLeft(node_);
+        if (balance < -1 && rightSubTree && key < rightSubTree->key_)
+            return bigRotateLeft(this);
 
-        return node_;
+        return this;
     }
 
     Node* getMinFromRightSubTree(Node* node)
@@ -154,14 +141,14 @@ public:
         Node* currentNode = node;
 
         while(currentNode->leftSubTree != nullptr)
-            currentNode = currentNode->leftSubTree->node_;
+            currentNode = currentNode->leftSubTree;
 
         return currentNode;
     }
 
     void removeNode(KeyType key)
     {
-        removeNode(key, node_);
+        removeNode(key, this);
     }
 
     Node* removeNode(KeyType key, Node* node)
@@ -169,15 +156,15 @@ public:
         if(node == nullptr)
             return node;
 
-        if(key < node->key)
-            node->leftSubTree->node_ = removeNode(key, node->leftSubTree? node->leftSubTree->node_: nullptr);
-        else if(key > node->key)
-            node->rightSubTree->node_ = removeNode(key, node->rightSubTree? node->rightSubTree->node_: nullptr);
+        if(key < node->key_)
+            node->leftSubTree = removeNode(key, node->leftSubTree);
+        else if(key > node->key_)
+            node->rightSubTree = removeNode(key, node->rightSubTree);
         else
         {
             if(node->leftSubTree == nullptr || node->rightSubTree == nullptr)
             {
-                Node* temp = node->leftSubTree ? node->leftSubTree->node_ : node->rightSubTree? node->rightSubTree->node_: nullptr;
+                Node* temp = node->leftSubTree ? node->leftSubTree: node->rightSubTree;
 
                 if (temp == nullptr)
                 {
@@ -186,20 +173,20 @@ public:
                 }
                 else
                 {
-                    node->key = temp->key;
-                    node->value = temp->value;
+                    node->key_ = temp->key_;
+                    node->value_ = temp->value_;
                 }
 
                 delete temp;
             }
             else
             {
-                Node* temp = getMinFromRightSubTree(node->rightSubTree->node_);
+                Node* temp = getMinFromRightSubTree(node->rightSubTree);
 
-                node->key = temp->key;
-                node->value = temp->value;
+                node->key_ = temp->key_;
+                node->value_ = temp->value_;
 
-                node->rightSubTree->node_ = removeNode(temp->key, node->rightSubTree->node_);
+                node->rightSubTree = removeNode(temp->key_, node->rightSubTree);
             }
         }
 
@@ -209,17 +196,17 @@ public:
         recalculateHeight(node);
         auto balance = getBalance(node);
 
-        if (balance > 1 && node->leftSubTree && key <= node->leftSubTree->node_->key)
-            return rotateRight(node_);
+        if (balance > 1 && node->leftSubTree && key <= node->leftSubTree->key_)
+            return rotateRight(this);
 
-        if (balance < -1 && node->rightSubTree && key > node->rightSubTree->node_->key)
-            return rotateLeft(node_);
+        if (balance < -1 && node->rightSubTree && key > node->rightSubTree->key_)
+            return rotateLeft(this);
 
-        if (balance > 1 && node->leftSubTree && key > node->leftSubTree->node_->key)
-            return bigRotateRight(node_);
+        if (balance > 1 && node->leftSubTree && key > node->leftSubTree->key_)
+            return bigRotateRight(this);
 
-        if (balance < -1 && node->rightSubTree && key < node->rightSubTree->node_->key)
-            return bigRotateLeft(node_);
+        if (balance < -1 && node->rightSubTree && key < node->rightSubTree->key_)
+            return bigRotateLeft(this);
 
         return node;
     }
@@ -228,23 +215,23 @@ public:
 
 
 };
-void fillVectorFromTree(std::vector<int>& vector, AvlTree<int, std::string>::Node* root)
+void fillVectorFromTree(std::vector<int>& vector, Node<int, std::string>* root)
 {
     if(root)
     {
-        if(root->leftSubTree)
-            fillVectorFromTree(vector, root->leftSubTree->getNode());
+        if(root->getLeftSubTree())
+            fillVectorFromTree(vector, root->getLeftSubTree());
 
-        vector.push_back(root->key);
+        vector.push_back(root->getKey());
 
-        if(root->rightSubTree)
-            fillVectorFromTree(vector, root->rightSubTree->getNode());
+        if(root->getRightSubTree())
+            fillVectorFromTree(vector, root->getRightSubTree());
     }
 }
 
 BOOST_AUTO_TEST_CASE(quicksort_test)
 {
-    AvlTree<int, std::string> tree(5, "root");
+    Node<int, std::string> tree(5, "root");
     tree.insert(7, "alala");
     tree.insert(3, "ololo");
     tree.insert(10, "atata");
@@ -259,7 +246,7 @@ BOOST_AUTO_TEST_CASE(quicksort_test)
     tree.insert(20, "wiwiwi");
 
     std::vector<int> keyOrder;
-    fillVectorFromTree(keyOrder, tree.getNode());
+    fillVectorFromTree(keyOrder, &tree);
 
     int prev = keyOrder[0];
     for(const auto& key: keyOrder)
@@ -275,7 +262,7 @@ BOOST_AUTO_TEST_CASE(quicksort_test)
     tree.removeNode(5);
     keyOrder.clear();
 
-    fillVectorFromTree(keyOrder, tree.getNode());
+    fillVectorFromTree(keyOrder, &tree);
 
     prev = keyOrder[0];
     for(const auto& key: keyOrder)
