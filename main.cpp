@@ -23,6 +23,16 @@ public:
         value_(value)
     {}
 
+    const Node& operator=(const Node& node)
+    {
+        leftSubTree = node.leftSubTree;
+        rightSubTree = node.rightSubTree;
+        value_ = node.value_;
+        key_ = node.key_;
+        height = node.height;
+        return *this;
+    }
+
     Node* getLeftSubTree() const {return leftSubTree; }
     Node* getRightSubTree() const {return rightSubTree; }
     KeyType getKey() const { return key_; }
@@ -54,7 +64,7 @@ private:
             return nullptr;
 
         pivotNode->rightSubTree = rightSubtree->leftSubTree;
-        rightSubtree->leftSubTree = new Node(pivotNode);
+        rightSubtree->leftSubTree = pivotNode;
 
         recalculateHeight(pivotNode);
         recalculateHeight(rightSubtree);
@@ -72,7 +82,7 @@ private:
             return nullptr;
 
         pivotNode->leftSubTree= leftSubtree->rightSubTree;
-        leftSubtree->rightSubTree = new Node(pivotNode);
+        leftSubtree->rightSubTree = pivotNode;
 
         recalculateHeight(pivotNode);
         recalculateHeight(leftSubtree);
@@ -90,6 +100,80 @@ private:
     {
         node->leftSubTree = rotateLeft(node->leftSubTree);
         return rotateRight(node);
+    }
+
+    Node* rebalance(Node* node, KeyType key)
+    {
+        recalculateHeight(node);
+        auto balance = getBalance(node);
+
+        if (balance > 1 && node->leftSubTree && key <= node->leftSubTree->key_)
+            return rotateRight(node);
+
+        if (balance < -1 && node->rightSubTree && key > node->rightSubTree->key_)
+            return rotateLeft(node);
+
+        if (balance > 1 && node->leftSubTree && key > node->leftSubTree->key_)
+            return bigRotateRight(node);
+
+        if (balance < -1 && node->rightSubTree && key < node->rightSubTree->key_)
+            return bigRotateLeft(node);
+
+        return node;
+    }
+
+    Node* removeNode(KeyType key, Node* node)
+    {
+        if(node == nullptr)
+            return node;
+
+        if(key < node->key_)
+            node->leftSubTree = removeNode(key, node->leftSubTree);
+        else if(key > node->key_)
+            node->rightSubTree = removeNode(key, node->rightSubTree);
+        else
+        {
+            if(node->leftSubTree == nullptr || node->rightSubTree == nullptr)
+            {
+                Node* temp = node->leftSubTree ? node->leftSubTree: node->rightSubTree;
+
+                if (temp == nullptr)
+                {
+                    temp = node;
+                    node = nullptr;
+                }
+                else
+                {
+                    *node = *temp;
+                }
+
+                delete temp;
+            }
+            else
+            {
+                Node* temp = getMinFromRightSubTree(node->rightSubTree);
+
+                node->key_ = temp->key_;
+                node->value_ = temp->value_;
+
+                node->rightSubTree = removeNode(temp->key_, node->rightSubTree);
+            }
+        }
+
+        if(node == nullptr)
+            return node;
+
+        return rebalance(node, key);
+    }
+
+    Node* getMinFromRightSubTree(Node* node)
+    {
+        Node* currentNode = node;
+
+        while(currentNode->leftSubTree != nullptr)
+            currentNode = currentNode->leftSubTree;
+
+        return currentNode;
     }
 
 public:
@@ -118,104 +202,19 @@ public:
             }
         }
 
-        recalculateHeight(this);
-        auto balance = getBalance(this);
-
-        if (balance > 1 && leftSubTree && key <= leftSubTree->key_)
-            return rotateRight(this);
-
-        if (balance < -1 && rightSubTree && key > rightSubTree->key_)
-            return rotateLeft(this);
-
-        if (balance > 1 && leftSubTree && key > leftSubTree->key_)
-            return bigRotateRight(this);
-
-        if (balance < -1 && rightSubTree && key < rightSubTree->key_)
-            return bigRotateLeft(this);
-
-        return this;
-    }
-
-    Node* getMinFromRightSubTree(Node* node)
-    {
-        Node* currentNode = node;
-
-        while(currentNode->leftSubTree != nullptr)
-            currentNode = currentNode->leftSubTree;
-
-        return currentNode;
-    }
+        return rebalance(this, key);
+    }    
 
     void removeNode(KeyType key)
     {
         removeNode(key, this);
     }
 
-    Node* removeNode(KeyType key, Node* node)
-    {
-        if(node == nullptr)
-            return node;
-
-        if(key < node->key_)
-            node->leftSubTree = removeNode(key, node->leftSubTree);
-        else if(key > node->key_)
-            node->rightSubTree = removeNode(key, node->rightSubTree);
-        else
-        {
-            if(node->leftSubTree == nullptr || node->rightSubTree == nullptr)
-            {
-                Node* temp = node->leftSubTree ? node->leftSubTree: node->rightSubTree;
-
-                if (temp == nullptr)
-                {
-                    temp = node;
-                    node = nullptr;
-                }
-                else
-                {
-                    node->key_ = temp->key_;
-                    node->value_ = temp->value_;
-                }
-
-                delete temp;
-            }
-            else
-            {
-                Node* temp = getMinFromRightSubTree(node->rightSubTree);
-
-                node->key_ = temp->key_;
-                node->value_ = temp->value_;
-
-                node->rightSubTree = removeNode(temp->key_, node->rightSubTree);
-            }
-        }
-
-        if(node == nullptr)
-            return node;
-
-        recalculateHeight(node);
-        auto balance = getBalance(node);
-
-        if (balance > 1 && node->leftSubTree && key <= node->leftSubTree->key_)
-            return rotateRight(this);
-
-        if (balance < -1 && node->rightSubTree && key > node->rightSubTree->key_)
-            return rotateLeft(this);
-
-        if (balance > 1 && node->leftSubTree && key > node->leftSubTree->key_)
-            return bigRotateRight(this);
-
-        if (balance < -1 && node->rightSubTree && key < node->rightSubTree->key_)
-            return bigRotateLeft(this);
-
-        return node;
-    }
-
-    void rebalance();
-
 
 };
-void fillVectorFromTree(std::vector<int>& vector, Node<int, std::string>* root)
+
+template<typename KeyType, typename ValueType>
+void fillVectorFromTree(std::vector<int>& vector, Node<KeyType, ValueType>* root)
 {
     if(root)
     {
@@ -230,7 +229,8 @@ void fillVectorFromTree(std::vector<int>& vector, Node<int, std::string>* root)
 }
 
 BOOST_AUTO_TEST_CASE(quicksort_test)
-{
+{    
+
     Node<int, std::string> tree(5, "root");
     tree.insert(7, "alala");
     tree.insert(3, "ololo");
@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(quicksort_test)
     int prev = keyOrder[0];
     for(const auto& key: keyOrder)
     {
-        BOOST_CHECK_MESSAGE(prev <= key, "tree was formed wrong - key: " << key);
+        BOOST_CHECK_MESSAGE(prev <= key, "tree after inserting was formed wrong - key: " << key);
         prev = key;
     }
 
@@ -267,7 +267,7 @@ BOOST_AUTO_TEST_CASE(quicksort_test)
     prev = keyOrder[0];
     for(const auto& key: keyOrder)
     {
-        BOOST_CHECK_MESSAGE(prev <= key, "tree was formed wrong - key: " << key);
+        BOOST_CHECK_MESSAGE(prev <= key, "tree after deleting was formed wrong - key: " << key);
         prev = key;
     }
 
